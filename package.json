@@ -1,0 +1,11 @@
+{
+  "name": "elevate",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Elevate 2.0 – persönliches Trainings-Logbuch (kein Build-Schritt, Vanilla-ES-Module)",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "test": "node --test"
+  }
+}

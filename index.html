@@ -1,0 +1,40 @@
+<title>Elevate</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Elevate – Trainings-Logbuch für Klettern, Hangboard, Kraft & Prävention, Laufen und Rad">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Inter:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/app.css">
+
+<div class="app" id="app">
+  <aside class="sidebar" id="sidebar" aria-label="Navigation">
+    <a class="brand" href="#dashboard" aria-label="Elevate – Dashboard">
+      <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
+        <rect width="32" height="32" rx="8" fill="var(--accent)"/>
+        <path d="M6 23.5 13 12l4 6 3-4.5 6 10z" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/>
+        <path d="M21.5 6.5v6M18.5 9.5l3-3 3 3" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">Elevate</span>
+    </a>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-foot">7c → 8a</div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="icon-btn menu-btn" id="btn-menu" aria-label="Navigation öffnen">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div class="page-head">
+        <h1 id="page-title">Elevate</h1>
+        <span class="page-sub" id="page-sub"></span>
+      </div>
+      <button type="button" class="btn primary add-btn" id="btn-add" title="Einheit erfassen (Taste N)"></button>
+    </header>
+    <div class="banner" id="banner"></div>
+    <main class="view" id="view">
+      <div class="loading"><span class="spinner"></span><span>Lade deine Trainingsdaten …</span></div>
+    </main>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
