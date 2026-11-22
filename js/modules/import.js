@@ -2,7 +2,7 @@
 // Idempotent: stable ids from the source; existing entries are skipped or, on request, overwritten.
 import store, { COLLECTIONS } from '../store/index.js';
 import { fmtD, wd } from '../domain/dates.js';
-import { GRIPS, GRIP_LABEL, HB_TYPES, HB_TYPE_LABEL, MODES, MODE_LABEL, describeBlock } from '../domain/hangboard.js';
+import { GRIPS, GRIP_LABEL, HB_TYPES, HB_TYPE_LABEL, MODES, MODE_LABEL, describeBlock, isOneArm } from '../domain/hangboard.js';
 import { KIND_LABEL } from '../domain/strength.js';
 import { TEST_LABEL } from '../domain/tests.js';
 import { parseRehabBoard } from '../import/rehabboard.js';
@@ -170,7 +170,7 @@ function hangCard() {
   const strengthBlocks = st.sessions.filter(s => s.type === 'Strength').flatMap(s => s.blocks);
   const allMode = strengthBlocks.length && strengthBlocks.every(b => b.mode === strengthBlocks[0].mode) ? strengthBlocks[0].mode : null;
   const modeSeg = seg(MODES.map(m => [m, MODE_LABEL[m]]), allMode, v => {
-    for (const b of strengthBlocks) { b.mode = v; b.side = v === 'lift_one_arm' ? 'each' : 'both'; }
+    for (const b of strengthBlocks) { b.mode = v; b.side = isOneArm(v) ? 'each' : 'both'; }
     st.options.strengthMode = v;
     rerender();
   });
@@ -186,7 +186,7 @@ function hangCard() {
       const cells = [h('code', { class: 'raw-line' }, b.raw)];
       if (b.mode === 'pullup') cells.push(h('span', { class: 'hint' }, MODE_LABEL.pullup), h('span'));
       else {
-        const mode = selectInput(MODES.map(m => [m, MODE_LABEL[m]]), b.mode, { 'aria-label': 'Ausführungsart', onchange: () => { b.mode = mode.value; b.side = b.switching ? 'alternating' : b.mode === 'lift_one_arm' ? 'each' : 'both'; rerender(); } });
+        const mode = selectInput(MODES.map(m => [m, MODE_LABEL[m]]), b.mode, { 'aria-label': 'Ausführungsart', onchange: () => { b.mode = mode.value; b.side = b.switching ? 'alternating' : isOneArm(b.mode) ? 'each' : 'both'; rerender(); } });
         const grip = selectInput(GRIPS.map(g => [g, GRIP_LABEL[g]]), b.grip, { 'aria-label': 'Griff', onchange: () => { b.grip = grip.value; rerender(); } });
         cells.push(mode, grip);
       }

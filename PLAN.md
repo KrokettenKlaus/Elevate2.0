@@ -50,14 +50,16 @@ Dieser Plan ist die Grundlage für die Umsetzung mit Claude Code. Abschnitt 10 e
 **Gradskala:** französisch, `5a` bis `9c` mit `+`, als geordnete Liste. **Halle und Fels werden kombiniert ausgewertet.** Das Feld `Ort` bleibt trotzdem gespeichert, damit später gefiltert werden kann.
 
 ### 3.3 Hangboard
-Drei Session-Typen. Jeder Satz bzw. Block speichert die **Ausführungsart**:
+Drei feste Session-Typen plus eigene Trainings. Jeder Satz bzw. Block speichert die **Ausführungsart**:
 - `lift_one_arm`: einarmig vom Boden angehobenes Gewicht (Block bzw. No-Hang). Die Last ist das gehobene Gewicht in kg, die Seite wird angegeben, auch abwechselnd.
+- `hang_one_arm`: einarmig am Hangboard. Last wie bei `hang_two_arm` (positiv = Zusatzgewicht, negativ = Entlastung), Wert `(KG + Last) / KG` an einer Hand.
 - `hang_two_arm`: beidarmig am Hangboard. Die Last ist Zusatzgewicht in kg: **positiv** bedeutet Zusatzgewicht, **negativ** bedeutet Entlastung über eine Umlenkrolle (Beispiel: `-10` ergibt Körpergewicht minus 10 kg).
 
 **Typen**
 - `Strength` (Maximalkraft): Hängezeit in s, Pause in s, Leiste in mm (Standard **20**), Griffart, Last, Wiederholungen, Sätze.
 - `PowerEndurance` (Repeater): Belastung/Pause in s (z.B. 7/3, 7/2), Leiste in mm, Griffart, Last, Wiederholungen pro Satz, Sätze, Seitenwechsel (ja/nein).
 - `PullUp`: Wiederholungen, Zusatzgewicht in kg, Sätze, Pause in s.
+- `Custom` (Eigenes Training): frei benannt (`name`), Blöcke mit allen Feldern; Ausführung pro Block `lift_one_arm`, `hang_two_arm` oder `pullup`. Einheiten mit gleichem Namen bilden eine eigene Verlaufsserie. Der Import aus `Hangboard.txt` erzeugt keine eigenen Trainings.
 
 Griffarten: `halfcrimp`, `open`, `slope`, `fullcrimp`, `pinch`.
 

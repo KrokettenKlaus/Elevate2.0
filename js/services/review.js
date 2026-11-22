@@ -61,7 +61,7 @@ export function buildWeekSummary(ws) {
       pyramide_12_monate: pyramidRows(data.ticks, settings.targetPyramid ?? {}, { since: addDays(end, -365) }).map(r => ({ grad: r.grade, begehungen: r.sends, soll: r.target || undefined })),
     },
     hangboard: data.hangboard_sessions.filter(inWeek).map(s => ({
-      datum: s.date, typ: s.type,
+      datum: s.date, typ: s.type === 'Custom' ? `Eigenes: ${s.name ?? ''}` : s.type,
       bloecke: (s.blocks ?? []).map(b => ({ text: describeBlock(s.type, b), prozent_kg: bw && b.load_kg != null ? round(pctBodyweight(s.type === 'PullUp' ? 'pullup' : b.mode, b.load_kg, bw.kg)) : undefined })),
     })),
     kraft_praevention: data.strength_sessions.filter(inWeek).map(s => ({ datum: s.date, art: s.kind, uebungen: s.exercises.length, notiz: s.notes || undefined })),

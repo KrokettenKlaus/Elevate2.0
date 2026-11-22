@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { addDays, daysBetween, dayKey, inSeason, isoWeek, weekStart, weekDates } from '../js/domain/dates.js';
 import { GRADES, compareGrades, maxSend, normalizeGrade, pyramid, pyramidProgress, pyramidRows } from '../js/domain/grades.js';
 import { acwrDaysMissing, acwrSeries, dailyLoads, ewma, loadEntries, monotony, srpe, weeklyLoads } from '../js/domain/load.js';
-import { bodyweightAt, hangSeries, pctBodyweight } from '../js/domain/hangboard.js';
+import { bodyweightAt, customNames, describeBlock, hangSeries, pctBodyweight, sessionLabel } from '../js/domain/hangboard.js';
 import { collectActuals, defaultTemplates, generateWeek, reconcileDay, reconcileWeek, templateForDate, weekPlan } from '../js/domain/plan.js';
 import { exWorkWeight, exerciseNames, lastExercise, progressRows, sesVolume } from '../js/domain/strength.js';
 import { findActivityList, moduleForSport, normalizeStravaActivity, pace, parseHrZones, suggestRpe } from '../js/domain/endurance.js';
@@ -303,4 +303,40 @@ test('tests: reference values and comparable series', () => {
   assert.equal(s25.reference.test.id, 'ref-max-hang');
   assert.equal(s25.pts.length, 1);
   assert.equal(series.find(s => s.key === 'max_hang|20').reference, null);
+});
+
+test('hangboard: custom trainings get their own series per name', () => {
+  const sessions = [
+    { id: 'a', date: '2026-11-01', type: 'Custom', name: 'Min-Edge', blocks: [{ mode: 'hang_two_arm', grip: 'halfcrimp', edge_mm: 10, load_kg: 0, reps: 5, work_s: 10 }] },
+    { id: 'b', date: '2026-11-08', type: 'Custom', name: 'Min-Edge', blocks: [{ mode: 'hang_two_arm', grip: 'halfcrimp', edge_mm: 10, load_kg: 5, reps: 5, work_s: 10 }] },
+    { id: 'c', date: '2026-11-09', type: 'Custom', name: 'Offset Pulls', blocks: [{ mode: 'pullup', load_kg: 10, reps: 3, sets: 4 }] },
+    { id: 'd', date: '2026-11-10', type: 'PullUp', blocks: [{ mode: 'pullup', load_kg: 20, reps: 5 }] },
+  ];
+  const series = hangSeries(sessions, [{ date: '2026-10-01', kg: 70 }]);
+  const edge = series.get('Custom:Min-Edge|hang_two_arm|halfcrimp|10');
+  assert.equal(edge.label, 'Min-Edge · 2-arm Hang · Half Crimp · 10 mm');
+  assert.deepEqual(edge.pts.map(p => p.load), [0, 5]);
+  const pulls = series.get('Custom:Offset Pulls|pullup||');
+  assert.equal(pulls.label, 'Offset Pulls · Klimmzug');
+  near(pulls.pts[0].pct, 80 / 70 * 100);
+  assert.equal(series.get('PullUp|pullup||').pts.length, 1);
+  assert.equal(describeBlock('Custom', sessions[2].blocks[0]), '4 × 3 Klimmzüge +10 kg');
+  assert.equal(sessionLabel(sessions[0]), 'Min-Edge');
+  assert.equal(sessionLabel({ type: 'Custom' }), 'Eigenes Training');
+  assert.equal(sessionLabel({ type: 'Strength' }), 'Maximalkraft');
+  assert.deepEqual(customNames([...sessions, { id: 'e', date: '2026-10-01', type: 'Custom', name: 'min-edge' }]), ['Offset Pulls', 'Min-Edge']);
+});
+
+test('hangboard: one-arm hangs accept assistance and form their own series', () => {
+  near(pctBodyweight('hang_one_arm', -20, 80), 75);
+  near(pctBodyweight('hang_one_arm', 5, 80), 106.25);
+  const series = hangSeries([
+    { id: 'a', date: '2026-11-20', type: 'Strength', blocks: [
+      { mode: 'hang_one_arm', grip: 'halfcrimp', edge_mm: 20, load_kg: -25, reps: 3, work_s: 7 },
+      { mode: 'hang_two_arm', grip: 'halfcrimp', edge_mm: 20, load_kg: 20, reps: 3, work_s: 7 }] },
+  ], [{ date: '2026-11-01', kg: 80 }]);
+  const one = series.get('Strength|hang_one_arm|halfcrimp|20');
+  assert.equal(one.label, 'Maximalkraft · 1-arm Hang · Half Crimp · 20 mm');
+  near(one.pts[0].pct, 55 / 80 * 100);
+  assert.equal(describeBlock('Strength', one.pts[0].block), '−25 kg · 3 Wdh. · 7 s · Half Crimp · 20 mm · 1-arm Hang');
 });

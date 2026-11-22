@@ -1,5 +1,6 @@
 // Planning: week templates, planned units and the planned-vs-actual reconciliation.
 import { DAY_KEYS, addDays, dayKey, inSeason, weekDates, weekStart } from './dates.js';
+import { sessionLabel } from './hangboard.js';
 
 export const PLAN_MODULES = ['climbing', 'hangboard', 'strength', 'run', 'ride', 'mobility', 'rest'];
 export const BLOCK_TYPES = ['Basis', 'Kraft', 'Power', 'Power-Endurance', 'Performance', 'Deload', 'Übergang'];
@@ -73,7 +74,7 @@ export function collectActuals(data) {
     out.push({ id: s.id, col: 'climb_sessions', date: s.date, module: 'climbing', label: s.type || 'Klettern', sub: s.place || '', duration_min: s.duration_min, rpe: s.rpe });
   }
   for (const s of data.hangboard_sessions ?? []) {
-    out.push({ id: s.id, col: 'hangboard_sessions', date: s.date, module: 'hangboard', label: s.type || 'Hangboard', sub: '', duration_min: s.duration_min, rpe: s.rpe });
+    out.push({ id: s.id, col: 'hangboard_sessions', date: s.date, module: 'hangboard', label: s.type ? sessionLabel(s) : 'Hangboard', sub: '', duration_min: s.duration_min, rpe: s.rpe });
   }
   for (const s of data.strength_sessions ?? []) {
     const hasMobility = (s.exercises ?? []).some(e => e.category === 'Mobilität' || MOBILITY_RE.test(e.name ?? ''));

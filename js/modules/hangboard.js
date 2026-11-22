@@ -2,13 +2,13 @@
 import store, { clone } from '../store/index.js';
 import { MONTHS, addDays, fmtD, fmtDs, today, wd } from '../domain/dates.js';
 import {
-  GRIPS, GRIP_LABEL, HB_TYPES, HB_TYPE_LABEL, MODES, MODE_LABEL, bodyweightAt, describeBlock, fmtLoad,
-  hangSeries, pctBodyweight, timeUnderTension,
+  CUSTOM, CUSTOM_MODES, EDITOR_TYPES, GRIPS, GRIP_LABEL, HB_TYPE_LABEL, MODES, MODE_LABEL, bodyweightAt, customNames, describeBlock, fmtLoad, isOneArm,
+  hangSeries, pctBodyweight, sessionLabel, timeUnderTension,
 } from '../domain/hangboard.js';
 import { testValue } from '../domain/tests.js';
 import { $, $$, emptyState, esc, fmtDur, fmtNum, fmtPct, h, icon, local, navigate } from '../ui/dom.js';
 import { confirmDialog, openDialog, toast } from '../ui/dialog.js';
-import { field, rpeScale, seg, selectInput } from '../ui/forms.js';
+import { datalist, field, rpeScale, seg, selectInput } from '../ui/forms.js';
 import { lineChart } from '../ui/charts.js';
 import { badge, btn, card, kpi, loadBadge, pressable } from '../ui/view.js';
 
@@ -58,7 +58,7 @@ export function render(root) {
   const bwNow = bodyweightAt(bws, t);
   const lastPt = cur?.pts.at(-1), firstPt = cur?.pts[0];
   root.append(h('div', { class: 'kpis' },
-    kpi('Letzte Einheit', fmtDs(last.date), `${wd(last.date)} · ${HB_TYPE_LABEL[last.type] ?? last.type}`, 'accent-hb'),
+    kpi('Letzte Einheit', fmtDs(last.date), `${wd(last.date)} · ${sessionLabel(last)}`, 'accent-hb'),
     kpi('Letzte 30 Tage', fmtNum(last30), 'Einheiten'),
     kpi('Körpergewicht', bwNow ? `${fmtNum(bwNow.kg, 1)} kg` : '–', bwNow ? `seit ${fmtD(bwNow.date)}` : 'unter Tests eintragen'),
     cur && lastPt ? kpi('Aktuell', lastPt.pct != null ? fmtPct(lastPt.pct) : fmtLoad(cur.mode, lastPt.load), cur.label) : null,
@@ -84,15 +84,16 @@ export function render(root) {
     });
     const parts = [];
     if (cur.mode === 'lift_one_arm') parts.push('Einarmig gehoben: Last ÷ Körpergewicht, pro Hand.');
+    else if (cur.mode === 'hang_one_arm') parts.push('Einarmig gehängt: (Körpergewicht + Last) ÷ Körpergewicht an einer Hand. Negative Last bedeutet Entlastung über die Umlenkrolle.');
     else parts.push('Beidarmig: (Körpergewicht + Last) ÷ Körpergewicht. Negative Last bedeutet Entlastung über die Umlenkrolle.');
     if (cur.pts.some(p => p.bwApprox)) parts.push('Vor dem ersten Körpergewichts-Eintrag wird mit dem frühesten bekannten Wert gerechnet.');
     if (ref && !ref.exact) parts.push(`Die Referenz von vor der Verletzung lief auf ${ref.edge} mm – wegen der anderen Leiste wird sie hier nicht eingezeichnet.`);
-    if (!ref && cur.mode === 'lift_one_arm') parts.push('Die Referenz (beidarmiger Max Hang) ist mit einarmigem Heben nicht vergleichbar.');
+    if (!ref && isOneArm(cur.mode)) parts.push(`Die Referenz (beidarmiger Max Hang) ist mit einarmigem ${cur.mode === 'lift_one_arm' ? 'Heben' : 'Hängen'} nicht vergleichbar.`);
     note.textContent = parts.join(' ');
   }
 
   // ---- sessions
-  const filter = seg([['all', 'Alle'], ...HB_TYPES.map(t2 => [t2, HB_TYPE_LABEL[t2]])], typeFilter, v => { typeFilter = v; render(root); });
+  const filter = seg([['all', 'Alle'], ...EDITOR_TYPES.map(t2 => [t2, HB_TYPE_LABEL[t2]])], typeFilter, v => { typeFilter = v; render(root); });
   const listEl = h('div', {});
   root.append(h('div', { class: 'toolbar' }, filter, h('span', { class: 'hint' }, `${ss.length} Einheiten`), h('span', { class: 'grow' }), btn('+ Einheit', () => openEditor(), 'primary')), listEl);
   let month = '', grid;
@@ -107,7 +108,7 @@ export function sessionCard(s, bws = store.list('bodyweight')) {
   const bw = bodyweightAt(bws, s.date);
   const tut = (s.blocks ?? []).reduce((a, b) => a + timeUnderTension(b), 0);
   return pressable('s-card hb', () => openEditor(s),
-    h('div', { class: 's-head' }, h('span', { class: 's-date' }, fmtD(s.date), h('small', {}, wd(s.date))), badge(HB_TYPE_LABEL[s.type] ?? s.type, 'hb')),
+    h('div', { class: 's-head' }, h('span', { class: 's-date' }, fmtD(s.date), h('small', {}, wd(s.date))), badge(sessionLabel(s), 'hb')),
     h('ul', { class: 'ex-list blocks' }, (s.blocks ?? []).map(b => {
       const mode = s.type === 'PullUp' ? 'pullup' : b.mode;
       const pct = bw && b.load_kg != null ? pctBodyweight(mode, b.load_kg, bw.kg) : null;
@@ -129,8 +130,10 @@ function blockRow(type, b, ctx) {
   const row = h('div', { class: 'block-edit' });
   row.dataset.raw = b.raw ?? '';
   const pctEl = h('span', { class: 'b-pct' });
-  const mode = type === 'PullUp' ? null : selectInput(MODES.map(m => [m, MODE_LABEL[m]]), b.mode && b.mode !== 'pullup' ? b.mode : ctx.defaultMode(type), { class: 'b-mode' });
-  const load = num('b-load', b.load_kg, { placeholder: 'kg' });
+  const custom = type === CUSTOM;
+  const modes = custom ? CUSTOM_MODES : MODES;
+  const mode = type === 'PullUp' ? null : selectInput(modes.map(m => [m, MODE_LABEL[m]]), b.mode && modes.includes(b.mode) ? b.mode : ctx.defaultMode(type), { class: 'b-mode' });
+  const load = num('b-load', b.load_kg, { placeholder: 'kg', title: 'Negativ = Entlastung über die Umlenkrolle (nicht beim einarmigen Heben)' });
   const fields = h('div', { class: 'b-grid' });
   if (type === 'PullUp') {
     fields.append(cell('Wiederholungen', num('b-reps', b.reps, { min: 0, step: 1 })), cell('Zusatzgewicht (kg)', load), cell('Sätze', num('b-sets', b.sets ?? 1, { min: 1, step: 1 })), cell('Pause (s)', num('b-rest', b.rest_s, { min: 0, step: 5 })));
@@ -144,7 +147,13 @@ function blockRow(type, b, ctx) {
       cell('Pause (s)', num('b-rest', b.rest_s, { min: 0, step: 1 })),
       cell('Leiste (mm)', num('b-edge', b.edge_mm ?? ctx.defaultEdge, { min: 4, step: 1 })),
       cell('Griff', selectInput(GRIPS.map(g => [g, GRIP_LABEL[g]]), b.grip ?? 'halfcrimp', { class: 'b-grip' })));
-    if (type === 'PowerEndurance') fields.append(h('label', { class: 'b-cell chk-cell' }, h('span', {}, 'Seitenwechsel'), h('input', { type: 'checkbox', class: 'b-switch', checked: !!b.switching })));
+    if (type === 'PowerEndurance' || custom) fields.append(h('label', { class: 'b-cell chk-cell' }, h('span', {}, 'Seitenwechsel'), h('input', { type: 'checkbox', class: 'b-switch', checked: !!b.switching })));
+    if (custom) {
+      // pull-ups have no edge or grip
+      const sync = () => $$('.b-edge, .b-grip, .b-switch', fields).forEach(el => { el.disabled = mode.value === 'pullup'; });
+      mode.addEventListener('change', sync);
+      sync();
+    }
   }
   const paint = () => {
     const bw = bodyweightAt(store.list('bodyweight'), ctx.date());
@@ -169,18 +178,24 @@ function collectBlocks(wrap, type) {
       return { mode: 'pullup', work_s: null, rest_s: n(row, 'b-rest'), edge_mm: null, grip: null, load_kg: n(row, 'b-load') ?? 0, reps: n(row, 'b-reps'), sets: n(row, 'b-sets') ?? 1, side: 'both', switching: false, raw: row.dataset.raw || undefined };
     }
     const mode = $('.b-mode', row).value;
+    if (mode === 'pullup') {
+      return { mode, work_s: n(row, 'b-work'), rest_s: n(row, 'b-rest'), edge_mm: null, grip: null, load_kg: n(row, 'b-load') ?? 0, reps: n(row, 'b-reps'), sets: n(row, 'b-sets') ?? 1, side: 'both', switching: false, raw: row.dataset.raw || undefined };
+    }
     const switching = !!$('.b-switch', row)?.checked;
     return {
       mode, work_s: n(row, 'b-work'), rest_s: n(row, 'b-rest'), edge_mm: n(row, 'b-edge'), grip: $('.b-grip', row).value,
       load_kg: n(row, 'b-load'), reps: n(row, 'b-reps'), sets: n(row, 'b-sets') ?? 1,
-      side: switching ? 'alternating' : mode === 'lift_one_arm' ? 'each' : 'both', switching, raw: row.dataset.raw || undefined,
+      side: switching ? 'alternating' : isOneArm(mode) ? 'each' : 'both', switching, raw: row.dataset.raw || undefined,
     };
   }).filter(b => b.load_kg != null || b.reps != null);
 }
 
 export function openEditor(session = null, preset = {}) {
   const settings = store.settings();
-  const lastOfType = type => sorted().find(s => s.type === type && s.id !== session?.id);
+  const sameName = (a, b) => (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+  const lastOfType = t => sorted().find(s => s.type === t && s.id !== session?.id && (t !== CUSTOM || sameName(s.name, nameInput.value)));
+  const nameInput = h('input', { type: 'text', id: 'hb-name', value: session?.name ?? preset.name ?? '', placeholder: 'z. B. Min-Edge, Density Hangs, No-Hangs', autocomplete: 'off', list: datalist('dl-hb-custom', customNames(sessions())) });
+  const nameField = field('Name des Trainings', nameInput, { hint: 'Einheiten mit demselben Namen bilden eine gemeinsame Verlaufskurve.' });
   const ctx = {
     date: () => date.value,
     defaultEdge: settings.defaultEdge ?? 20,
@@ -195,7 +210,10 @@ export function openEditor(session = null, preset = {}) {
     if (prev?.blocks?.length) return clone(prev.blocks).map(b => { delete b.raw; return b; });
     return [t === 'PullUp' ? { reps: 5, sets: 5, rest_s: 180 } : t === 'PowerEndurance' ? { work_s: 7, rest_s: 3, sets: 3 } : { work_s: 7, rest_s: 180, reps: 4, sets: 1 }];
   };
-  const typeSeg = seg(HB_TYPES.map(t => [t, HB_TYPE_LABEL[t]]), type, v => { type = v; fill(session && session.type === v ? clone(session.blocks) : starter(v)); hint(); });
+  const showName = () => { nameField.hidden = type !== CUSTOM; };
+  const typeSeg = seg(EDITOR_TYPES.map(t => [t, HB_TYPE_LABEL[t]]), type, v => { type = v; showName(); fill(session && session.type === v ? clone(session.blocks) : starter(v)); hint(); if (v === CUSTOM && !nameInput.value) nameInput.focus(); });
+  // a known custom name pre-fills the blocks of its last session
+  nameInput.addEventListener('change', () => { if (!session && type === CUSTOM && lastOfType(CUSTOM)) { fill(starter(CUSTOM)); hint(); } });
   const warm = h('input', { type: 'checkbox', id: 'hb-warm', checked: session ? !!session.warmup : true });
   const duration = h('input', { type: 'number', id: 'hb-duration', min: 0, step: 5, placeholder: 'optional', value: session?.duration_min ?? '' });
   const rpe = rpeScale(session?.rpe ?? null);
@@ -205,6 +223,7 @@ export function openEditor(session = null, preset = {}) {
   const hint = () => { const prev = lastOfType(type); hintEl.textContent = !session && prev ? `Vorbelegt mit den Werten vom ${fmtDs(prev.date)}.` : ''; };
   fill(session ? clone(session.blocks ?? []) : starter(type));
   hint();
+  showName();
   date.addEventListener('change', () => $$('.block-edit', blocksEl).forEach(r => r.paint()));
 
   const d = openDialog({
@@ -212,7 +231,7 @@ export function openEditor(session = null, preset = {}) {
     size: 'lg',
     body: [
       h('div', { class: 'row' }, field('Datum', date), field('Typ', typeSeg), h('label', { class: 'field inline' }, h('span', { class: 'lbl' }, 'Aufwärmen'), h('span', { class: 'chk' }, warm, 'ja'))),
-      hintEl, blocksEl,
+      nameField, hintEl, blocksEl,
       h('div', { class: 'add-row' }, btn('+ Block', () => { const rows = collectBlocks(blocksEl, type); const b = rows.at(-1) ? { ...rows.at(-1), raw: undefined } : starter(type)[0]; const r = blockRow(type, b, ctx); blocksEl.append(r); $('.b-load', r).focus(); })),
       h('div', { class: 'row load-row' }, field('Dauer (min)', duration, { hint: 'für die Belastung (sRPE)' }), field('Anstrengung (RPE)', rpe)),
       field('Notizen', notes),
@@ -229,6 +248,8 @@ export function openEditor(session = null, preset = {}) {
     ],
     onSubmit: async () => {
       if (!date.value) return toast('Bitte ein Datum wählen', true);
+      const name = nameInput.value.trim();
+      if (type === CUSTOM && !name) { nameInput.focus(); return toast('Bitte dem eigenen Training einen Namen geben', true); }
       const blocks = collectBlocks(blocksEl, type);
       if (!blocks.length) return toast('Mindestens einen Block mit Last oder Wiederholungen eintragen', true);
       // the original line only stays while the block still says what it said
@@ -238,6 +259,10 @@ export function openEditor(session = null, preset = {}) {
         id: session?.id ?? uniqueId(date.value), date: date.value, type, warmup: warm.checked, blocks,
         duration_min: duration.value === '' ? null : Number(duration.value), rpe: rpe.getValue(), notes: notes.value.trim(),
       };
+      if (type === CUSTOM) {
+        // reuse the spelling of an existing training so series don't split on capitalisation
+        doc.name = customNames(sessions().filter(s => s.id !== session?.id)).find(n => sameName(n, name)) ?? name;
+      } else delete doc.name;
       await store.put('hangboard_sessions', doc);
       d.close();
       toast(session ? 'Einheit aktualisiert' : 'Einheit gespeichert');
