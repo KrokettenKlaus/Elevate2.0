@@ -7,7 +7,7 @@ Grundlage ist `PLAN.md`. Vanilla JavaScript (ES-Module), HTML, CSS – kein Buil
 
 ```
 npm start        # http://localhost:5173
-npm test         # 33 Tests: Domain-Logik, Import-Parser gegen die echten Dateien, Coros-Leser, Speicher-Schicht
+npm test         # 35 Tests: Domain-Logik, Import-Parser gegen die echten Dateien, Coros-Leser, Speicher-Schicht
 ```
 
 `index.html` enthält nur den Seiteninhalt (ohne `<html>`, `<head>`, `<body>`), so wie eine Artifact-Seite
